@@ -1,0 +1,14 @@
+{
+    "files.exclude": {
+        "_build/**": true,
+        "**/.git": true,
+        "**/.hg": true,
+        "**/.svn": true,
+        "**/*.pyc": true,
+        "**/CVS": true,
+        "tmp": true
+    },
+    "search.exclude": {
+        "_build/**": true
+    }
+}

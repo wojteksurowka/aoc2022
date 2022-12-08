@@ -14,7 +14,8 @@ read(Module, RE, Types) ->
                     ({Group, integer}) -> binary_to_integer(binary:part(Line, Group));
                     ({Group, character}) -> hd(binary_to_list(binary:part(Line, Group)));
                     ({Group, binary}) -> binary:part(Line, Group);
-                    ({Group, list}) -> binary_to_list(binary:part(Line, Group))
+                    ({Group, list}) -> binary_to_list(binary:part(Line, Group));
+                    ({Group, tuple}) -> list_to_tuple(binary_to_list(binary:part(Line, Group)))
                 end, lists:zip(Groups, Types)),
                 case Types of
                     [_Single] -> {true, hd(Converted)};

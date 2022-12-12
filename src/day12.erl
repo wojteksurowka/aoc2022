@@ -50,30 +50,6 @@ height(Grid) -> tuple_size(Grid).
 
 el({X, Y}, Grid) -> element(X, element(Y, Grid)).
 
-find_start(Grid) ->
-    lists:foldl(fun (X, XAcc) ->
-        lists:foldl(fun
-            (Y, undefined) ->
-                case el({X, Y}, Grid) of
-                    $S -> {X, Y};
-                    _ -> undefined
-                end;
-            (_Y, Result) ->
-                Result
-        end, XAcc, lists:seq(1, height(Grid)))
-    end, undefined, lists:seq(1, width(Grid))).
-
-find_a(Grid) ->
-    lists:foldl(fun (X, XAcc) ->
-        lists:foldl(fun (Y, Acc) ->
-            case el({X, Y}, Grid) of
-                $S -> [{X, Y} | Acc];
-                $a -> [{X, Y} | Acc];
-                _ -> Acc
-            end
-        end, XAcc, lists:seq(1, height(Grid)))
-    end, [], lists:seq(1, width(Grid))).
-
 neighbours({X, Y}, Grid) ->
     Width = width(Grid),
     Height = height(Grid),
@@ -134,9 +110,10 @@ dijkstra(Current, Unvisited, Visited, Grid) ->
 
 part1() ->
     Grid = input(),
-    Start = find_start(Grid),
+    [Start] = [{X, Y} || X <- lists:seq(1, width(Grid)), Y <- lists:seq(1, height(Grid)), el({X, Y}, Grid) == $S],
     dijkstra(Start, bimap_set(Start, 0, bimap_new()), #{}, Grid).
 
 part2() ->
     Grid = input(),
-    lists:min([dijkstra(Start, bimap_set(Start, 0, bimap_new()), #{}, Grid) || Start <- find_a(Grid)]).
+    Starts = [{X, Y} || X <- lists:seq(1, width(Grid)), Y <- lists:seq(1, height(Grid)), el({X, Y}, Grid) == $a orelse el({X, Y}, Grid) == $S],
+    lists:min([dijkstra(Start, bimap_set(Start, 0, bimap_new()), #{}, Grid) || Start <- Starts]).

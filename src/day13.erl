@@ -48,8 +48,7 @@ part2() ->
         [First, Second | Acc]
     end, [[[2]], [[6]]], input()),
     Sorted = lists:sort(fun (L, R) ->
-        Result = compare(L, R),
-        Result =:= less orelse Result =:= equal
+        compare(L, R) =/= greater
     end, Flattened),
     lists:foldl(fun
         ({[[2]], Index}, Acc) -> Acc * Index;

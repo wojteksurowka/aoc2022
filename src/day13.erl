@@ -2,15 +2,15 @@
 -export([part1/0, part2/0]).
 
 input() ->
-    convert(aoc_input:read(?MODULE, "^(.+)$", [binary])).
+    convert(aoc_input:read(?MODULE, "^(.+)$", [list])).
 
 convert([]) ->
     [];
 convert([First, Second | T]) ->
     [{parse(First), parse(Second)} | convert(T)].
 
-parse(Binary) ->
-    {ok, Tokens, _Loc} = erl_scan:string(binary_to_list(Binary) ++ "."),
+parse(String) ->
+    {ok, Tokens, _Loc} = erl_scan:string(String ++ "."),
     {ok, Parsed} = erl_parse:parse_term(Tokens),
     Parsed.
 

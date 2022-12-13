@@ -28,9 +28,8 @@ compare(L, []) when is_list(L) ->
     greater;
 compare([LH | LT], [RH | RT]) ->
     case compare(LH, RH) of
-        less -> less;
-        greater -> greater;
-        equal -> compare(LT, RT)
+        equal -> compare(LT, RT);
+        Diff -> Diff
     end;
 compare(L, R) when is_integer(L) ->
     compare([L], R);

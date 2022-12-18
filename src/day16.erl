@@ -89,21 +89,37 @@ open(Name, State) ->
         closed = State#state.closed - 1
     }.
 
-find1(_Opener, _State, 0, Total) ->
-    Total;
-find1(Opener, State, Remaining, Total) ->
-    Total + lists:max(lists:map(fun ({O, S}) ->
-        find1(O, S, Remaining - 1, State#state.opened_flow)
-    end, next_steps(Opener, State))).
+find1(_Opener, _State, 0, Total, Cache) ->
+    {Total, Cache};
+find1(Opener, State, Remaining, Total, Cache) ->
+    Key = {Opener#opener.location, Remaining, State#state.valves},
+    case Cache of
+        #{Key := CachedRest} ->
+            {Total + CachedRest, Cache};
+        _ ->
+            {Rest, CacheWithRest} = lists:foldl(fun ({O, S}, {RestAcc, CacheAcc}) ->
+                {NextRest, NextCache} = find1(O, S, Remaining - 1, State#state.opened_flow, CacheAcc),
+                {max(NextRest, RestAcc), NextCache}
+            end, {0, Cache}, next_steps(Opener, State)),
+            {Total + Rest, CacheWithRest#{Key => Rest}}
+    end.
 
-find2(_Opener1, _Opener2, _State, 0, Total) ->
-    Total;
-find2(Opener1, Opener2, State, Remaining, Total) ->
-    Total + lists:max(lists:map(fun ({O1, S1}) ->
-        lists:max(lists:map(fun ({O2, S2}) ->
-            find2(O1, O2, S2, Remaining - 1, S1#state.opened_flow)
-        end, next_steps(Opener2, S1)))
-    end, next_steps(Opener1, State))).
+find2(_Opener1, _Opener2, _State, 0, Total, Cache) ->
+    {Total, Cache};
+find2(Opener1, Opener2, State, Remaining, Total, Cache) ->
+    Key = {min(Opener1#opener.location, Opener2#opener.location), max(Opener1#opener.location, Opener2#opener.location), Remaining, State#state.valves},
+    case Cache of
+        #{Key := CachedRest} ->
+            {Total + CachedRest, Cache};
+        _ ->
+            {Rest, CacheWithRest} = lists:foldl(fun ({O1, S1}, Acc1) ->
+                lists:foldl(fun ({O2, S2}, {RestAcc2, CacheAcc2}) ->
+                    {NextRest, NextCache} = find2(O1, O2, S2, Remaining - 1, State#state.opened_flow, CacheAcc2),
+                    {max(NextRest, RestAcc2), NextCache}
+                end, Acc1, next_steps(Opener2, S1))
+            end, {0, Cache}, next_steps(Opener1, State)),
+            {Total + Rest, CacheWithRest#{Key => Rest}}
+    end.
 
 part1() ->
     Valves = remove_zero_valves_except(input(), 'AA'),
@@ -113,7 +129,7 @@ part1() ->
         _ ->
             {tunnels_to_list(Valves), maps:size(Valves)}
     end,
-    find1(#opener{location = 'AA'}, #state{valves = UpdatedValves, closed = ClosedCount}, 30, 0).
+    element(1, find1(#opener{location = 'AA'}, #state{valves = UpdatedValves, closed = ClosedCount}, 30, 0, #{})).
 
 part2() ->
     Valves = remove_zero_valves_except(input(), 'AA'),
@@ -124,4 +140,4 @@ part2() ->
             {tunnels_to_list(Valves), maps:size(Valves)}
     end,
     State = #state{valves = UpdatedValves, closed = ClosedCount},
-    find2(#opener{location = 'AA'}, #opener{location = 'AA'}, State, 26, 0).
+    element(1, find2(#opener{location = 'AA'}, #opener{location = 'AA'}, State, 26, 0, #{})).

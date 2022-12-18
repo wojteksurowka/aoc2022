@@ -3,7 +3,7 @@
 
 -record(valve, {flow, tunnels, open = false}).
 -record(opener, {location, visited_since_open = sets:new()}).
--record(state, {valves, opened_flow = 0, left_to_open}).
+-record(state, {valves, opened_flow = 0, closed}).
 
 input() ->
     VFL = aoc_input:read(?MODULE, "^Valve (..) has flow rate=(\\d+); tunnels? leads? to valves? (.+)$", [atom, integer, binary]),
@@ -23,16 +23,6 @@ remove_zero_valves_except(Input, Except) ->
             remove_zero_valves_except(remove_valve(Name, Input), Except);
         false ->
             Input
-    end.
-
-non_zero_valves_and_starting_points(Input, Start) ->
-    AllButOne = remove_zero_valves_except(Input, Start),
-    StartValve = maps:get(Start, AllButOne),
-    case StartValve#valve.flow of
-        0 ->
-            {tunnels_to_list(remove_valve(Start, AllButOne)), maps:to_list(StartValve#valve.tunnels)};
-        _ ->
-            {tunnels_to_list(AllButOne), [Start]}
     end.
 
 tunnels_to_list(Valves) ->
@@ -63,7 +53,7 @@ next_steps(#opener{location = {Target, 1}} = Opener, State) ->
     [{Opener#opener{location = Target, visited_since_open = UpdatedVSO}, State}];
 next_steps(#opener{location = {Target, Distance}} = Opener, State) ->
     [{Opener#opener{location = {Target, Distance - 1}}, State}];
-next_steps(Opener, #state{left_to_open = 0} = State) ->
+next_steps(Opener, #state{closed = 0} = State) ->
     [{Opener, State}];
 next_steps(Opener, State) ->
     Valve = maps:get(Opener#opener.location, State#state.valves),
@@ -96,7 +86,7 @@ open(Name, State) ->
     State#state{
         valves = UpdatedValves,
         opened_flow = State#state.opened_flow + Valve#valve.flow,
-        left_to_open = State#state.left_to_open - 1
+        closed = State#state.closed - 1
     }.
 
 find1(_Opener, _State, 0, Total) ->
@@ -115,15 +105,23 @@ find2(Opener1, Opener2, State, Remaining, Total) ->
         end, next_steps(Opener2, S1)))
     end, next_steps(Opener1, State))).
 
-find2_wrapper(Opener1, Opener2, State, Remaining, Total) ->
-    io:format("~p ~p~n", [Opener1#opener.location, Opener2#opener.location]),
-    find2(Opener1, Opener2, State, Remaining, Total).
-
 part1() ->
-    {Valves, Starts} = non_zero_valves_and_starting_points(input(), 'AA'),
-    lists:max([find1(#opener{location = S}, #state{valves = Valves, left_to_open = maps:size(Valves)}, 30, 0) || S <- Starts]).
+    Valves = remove_zero_valves_except(input(), 'AA'),
+    {UpdatedValves, ClosedCount} = case Valves of
+        #{'AA' := #valve{flow = 0} = ValveAA} ->
+            {tunnels_to_list(Valves#{'AA' := ValveAA#valve{open = true}}), maps:size(Valves) - 1};
+        _ ->
+            {tunnels_to_list(Valves), maps:size(Valves)}
+    end,
+    find1(#opener{location = 'AA'}, #state{valves = UpdatedValves, closed = ClosedCount}, 30, 0).
 
 part2() ->
-    {Valves, Starts} = non_zero_valves_and_starting_points(input(), 'AA'),
-    State = #state{valves = Valves, left_to_open = maps:size(Valves)},
-    lists:max([find2_wrapper(#opener{location = Start1}, #opener{location = Start2}, State, 26, 0) || Start1 <- Starts, Start2 <- Starts]).
+    Valves = remove_zero_valves_except(input(), 'AA'),
+    {UpdatedValves, ClosedCount} = case Valves of
+        #{'AA' := #valve{flow = 0} = ValveAA} ->
+            {tunnels_to_list(Valves#{'AA' := ValveAA#valve{open = true}}), maps:size(Valves) - 1};
+        _ ->
+            {tunnels_to_list(Valves), maps:size(Valves)}
+    end,
+    State = #state{valves = UpdatedValves, closed = ClosedCount},
+    find2(#opener{location = 'AA'}, #opener{location = 'AA'}, State, 26, 0).

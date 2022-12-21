@@ -6,11 +6,10 @@ input() ->
     Expressions = maps:from_list([{T, {L, O, R}} || {T, L, O, R} <- aoc_input:read(?MODULE, "^(....): (....) (.) (....)$", [atom, atom, atom, atom])]),
     {Numbers, Expressions}.
 
-calculate(LValue, '+', RValue) when is_number(LValue), is_number(RValue) -> LValue + RValue;
-calculate(LValue, '-', RValue) when is_number(LValue), is_number(RValue) -> LValue - RValue;
-calculate(LValue, '*', RValue) when is_number(LValue), is_number(RValue) -> LValue * RValue;
-calculate(LValue, '/', RValue) when is_number(LValue), is_number(RValue) -> LValue / RValue;
-calculate(LValue, Op, RValue) -> {LValue, Op, RValue}.
+calculate(LValue, '+', RValue) -> LValue + RValue;
+calculate(LValue, '-', RValue) -> LValue - RValue;
+calculate(LValue, '*', RValue) -> LValue * RValue;
+calculate(LValue, '/', RValue) -> round(LValue / RValue).
 
 reduce({Numbers, Expressions}) when map_size(Expressions) =:= 0 ->
     Numbers;
@@ -27,45 +26,33 @@ reduce({Numbers, Expressions}) ->
 part1() ->
     maps:get(root, reduce(input())).
 
-calculateL(H, L, Numbers, ExpressionsWithoutRoot) ->
-    maps:get(L, reduce({Numbers#{humn => H}, ExpressionsWithoutRoot})).
-
-find_initial_range(N, Calculate, Constant) ->
+find_initial_range(N, Calculate) ->
     ValueL = Calculate(-N),
     ValueR = Calculate(N),
-    case ValueL < Constant andalso ValueR > Constant orelse ValueL > Constant andalso ValueR < Constant of
-        true -> N;
-        false -> find_initial_range(N * 10, Calculate, Constant)
+    case ValueL < 0 andalso ValueR > 0 orelse ValueL > 0 andalso ValueR < 0 of
+        true -> {-N, N};
+        false -> find_initial_range(N * 10, Calculate)
     end.
 
-bisect(From, To, _Calculate, _Constant) when To - From == 2 ->
-    From + 1;
-bisect(From, To, Calculate, Constant) ->
+bisect({From, To}, Calculate) ->
     FromValue = Calculate(From),
     ToValue = Calculate(To),
     Mid = From + (To - From) div 2,
-    MidValue = Calculate(Mid),
-    case {FromValue == Constant, ToValue == Constant, FromValue < ToValue} of
-        {true, _, _} -> From;
-        {false, true, _} -> To;
-        {false, false, true} ->
-            if
-                MidValue > Constant -> bisect(From, Mid, Calculate, Constant);
-                MidValue < Constant -> bisect(Mid, To, Calculate, Constant);
-                true -> Mid
-            end;
-        {false, false, false} ->
-            if
-                MidValue > Constant -> bisect(Mid, To, Calculate, Constant);
-                MidValue < Constant -> bisect(From, Mid, Calculate, Constant);
-                true -> Mid
+    case Calculate(Mid) of
+        0 ->
+            Mid;
+        MidValue ->
+            case (FromValue < ToValue) =:= (MidValue > 0) of
+                true -> bisect({From, Mid}, Calculate);
+                false -> bisect({Mid, To}, Calculate)
             end
     end.
 
 part2() ->
     {Numbers, Expressions} = input(),
     {{L, _, R}, ExpressionsWithoutRoot} = maps:take(root, Expressions),
-    Constant = maps:get(R, reduce({Numbers#{humn => humn}, ExpressionsWithoutRoot})),
-    Calculate = fun (H) -> calculateL(H, L, Numbers, ExpressionsWithoutRoot) end,
-    Range = find_initial_range(1, Calculate, Constant),
-    bisect(-Range, Range, Calculate, Constant).
+    Calculate = fun (H) ->
+        Reduced = reduce({Numbers#{humn => H}, ExpressionsWithoutRoot}),
+        maps:get(L, Reduced) - maps:get(R, Reduced)
+    end,
+    bisect(find_initial_range(1, Calculate), Calculate).

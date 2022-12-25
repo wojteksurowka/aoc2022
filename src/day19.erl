@@ -1,5 +1,5 @@
 -module(day19).
--export([part1/0]).
+-export([part1/0, part2/0]).
 
 -record(blueprint, {id, ore, clay, obsidian, geode}).
 -record(cost, {ore, clay = 0, obsidian = 0}).
@@ -48,33 +48,51 @@ add(Robots, State) ->
 minute(Robots, Blueprint, State) ->
     add(Robots, collect(buy(Robots, Blueprint, State))).
 
-can_buy_one(Cost, State) ->
-    EnoughOre = State#state.ore >= Cost#cost.ore,
-    EnoughOreAndClay = EnoughOre andalso State#state.clay >= Cost#cost.clay,
-    EnoughOreAndClay andalso State#state.obsidian >= Cost#cost.obsidian.
+can_buy_one(Blueprint, BlueprintIndex, CostIndex, RobotsIndex, State) ->
+    MakeSense = case CostIndex of
+        undefined ->
+            true;
+        _ ->
+            MaxCost = lists:max([
+                element(CostIndex, Blueprint#blueprint.geode),
+                element(CostIndex, Blueprint#blueprint.obsidian),
+                element(CostIndex, Blueprint#blueprint.clay),
+                element(CostIndex, Blueprint#blueprint.ore)
+            ]),
+            element(RobotsIndex, State#state.robots) < MaxCost
+    end,
+    case MakeSense of
+        true ->
+            Cost = element(BlueprintIndex, Blueprint),
+            EnoughOre = State#state.ore >= Cost#cost.ore,
+            EnoughOreAndClay = EnoughOre andalso State#state.clay >= Cost#cost.clay,
+            EnoughOreAndClay andalso State#state.obsidian >= Cost#cost.obsidian;
+        false ->
+            false
+    end.
 
 can_buy(_Blueprint, 1, _State) ->
     [#robots{ore = 0, clay = 0, obsidian = 0, geode = 0}];
 can_buy(Blueprint, 2, State) ->
-    case can_buy_one(Blueprint#blueprint.geode, State) of
+    case can_buy_one(Blueprint, #blueprint.geode, undefined, undefined, State) of
         false -> [#robots{ore = 0, clay = 0, obsidian = 0, geode = 0}];
         true -> [#robots{ore = 0, clay = 0, obsidian = 0, geode = 0}, #robots{ore = 0, clay = 0, obsidian = 0, geode = 1}]
     end;
 can_buy(Blueprint, Remaining, State) ->
     Init = [#robots{ore = 0, clay = 0, obsidian = 0, geode = 0}],
-    WithGeode = case can_buy_one(Blueprint#blueprint.geode, State) of
+    WithGeode = case can_buy_one(Blueprint, #blueprint.geode, undefined, undefined, State) of
         false -> Init;
         true -> [#robots{ore = 0, clay = 0, obsidian = 0, geode = 1} | Init]
     end,
-    WithObsidian = case can_buy_one(Blueprint#blueprint.obsidian, State) of
+    WithObsidian = case can_buy_one(Blueprint, #blueprint.obsidian, #cost.obsidian, #robots.obsidian, State) of
         false -> WithGeode;
         true -> [#robots{ore = 0, clay = 0, obsidian = 1, geode = 0} | WithGeode]
     end,
-    WithClay = case Remaining > 3 andalso can_buy_one(Blueprint#blueprint.clay, State) of
+    WithClay = case Remaining > 3 andalso can_buy_one(Blueprint, #blueprint.clay, #cost.clay, #robots.clay, State) of
         false -> WithObsidian;
         true -> [#robots{ore = 0, clay = 1, obsidian = 0, geode = 0} | WithObsidian]
     end,
-    case can_buy_one(Blueprint#blueprint.ore, State) of
+    case can_buy_one(Blueprint, #blueprint.ore, #cost.ore, #robots.ore, State) of
         false -> WithClay;
         true -> [#robots{ore = 1, clay = 0, obsidian = 0, geode = 0} | WithClay]
     end.
@@ -82,12 +100,8 @@ can_buy(Blueprint, Remaining, State) ->
 next(_Blueprint, 0, State, _CBBD, Cache) ->
     {State#state.geode, Cache};
 next(Blueprint, Remaining, State, CBBD, Cache) ->
-    case maps:size(Cache) rem 10000 of
-        -1 -> io:format("~p ~p~n", [maps:size(Cache), State]);
-        _ -> ok
-    end,
-    Key = {Blueprint#blueprint.id, Remaining, State#state{geode = 0}},
-    R = case maps:get(Key, Cache, undefined) of
+    Key = {Remaining, State#state{geode = 0}},
+    case maps:get(Key, Cache, undefined) of
         undefined ->
             CanBuy = can_buy(Blueprint, Remaining, State),
             CouldBuy = case CanBuy of
@@ -100,23 +114,18 @@ next(Blueprint, Remaining, State, CBBD, Cache) ->
             end,
             {Geode, CacheAfter} = lists:foldl(fun (Robots, {GeodeAcc, CacheAcc}) ->
                 ButDidnt = Robots =:= #robots{ore = 0, clay = 0, obsidian = 0, geode = 0},
-                {NextGeode, NextCache} = next(Blueprint, Remaining - 1, minute(Robots, Blueprint, State#state{geode = 0}), CouldBuy andalso ButDidnt, CacheAcc),
+                NextMinute = minute(Robots, Blueprint, State#state{geode = 0}),
+                {NextGeode, NextCache} = next(Blueprint, Remaining - 1, NextMinute, CouldBuy andalso ButDidnt, CacheAcc),
                 {max(NextGeode, GeodeAcc), NextCache}
             end, {0, Cache}, FinalCanBuy),
             {Geode + State#state.geode, CacheAfter#{Key => Geode}};
         Geode ->
             {Geode + State#state.geode, Cache}
-    end,
-    case Remaining of
-        32 -> io:format("~p~n", [R]);
-        _ -> ok
-    end,
-    R.
+    end.
 
 part1() ->
-    lists:sum([element(1, next(Blueprint, 24, #state{}, false, #{})) * Blueprint#blueprint.id || Blueprint <- lists:sublist(input(), 2)]).
+    lists:sum([element(1, next(Blueprint, 24, #state{}, false, #{})) * Blueprint#blueprint.id || Blueprint <- input()]).
 
 part2() ->
-    [element(1, next(Blueprint, 28, #state{}, false, #{})) || Blueprint <- lists:sublist(input(), 1)].
-    %[X, Y, Z] = [element(1, next(Blueprint, 32, #state{}, #{})) || Blueprint <- lists:sublist(input(), 3)],
-    %X * Y * Z.
+    [X, Y, Z] = [element(1, next(Blueprint, 32, #state{}, false, #{})) || Blueprint <- lists:sublist(input(), 3)],
+    X * Y * Z.
